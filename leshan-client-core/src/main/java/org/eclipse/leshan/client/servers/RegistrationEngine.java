@@ -99,19 +99,19 @@ public class RegistrationEngine {
         ServersInfo serversInfo = ServersInfoExtractor.getInfo(objectEnablers);
 
         if (serversInfo.bootstrap == null) {
-            LOG.error("Trying to bootstrap device but there is no bootstrap server config.");
+            LOG.info("Trying to bootstrap device but there is no bootstrap server config.");
             return false;
         }
 
+        LOG.info("Trying to start bootstrap session to {} ...", serversInfo.bootstrap.getFullUri());
         if (bootstrapHandler.tryToInitSession(serversInfo.bootstrap)) {
-            LOG.info("Trying to start bootstrap session to {} ...", serversInfo.bootstrap.getFullUri());
             try {
                 // Send bootstrap request
                 ServerInfo bootstrapServer = serversInfo.bootstrap;
                 BootstrapResponse response = sender.send(bootstrapServer.getAddress(), bootstrapServer.isSecure(),
                         new BootstrapRequest(endpoint), null);
                 if (response == null) {
-                    LOG.error("Unable to start bootstrap session: Timeout.");
+                    LOG.info("Unable to start bootstrap session: Timeout.");
                     if (observer != null) {
                         observer.onBootstrapTimeout(bootstrapServer);
                     }
@@ -121,7 +121,7 @@ public class RegistrationEngine {
                     // wait until it is finished (or too late)
                     boolean timeout = !bootstrapHandler.waitBoostrapFinished(BS_TIMEOUT);
                     if (timeout) {
-                        LOG.error("Bootstrap sequence aborted: Timeout.");
+                        LOG.info("Bootstrap sequence aborted: Timeout.");
                         if (observer != null) {
                             observer.onBootstrapTimeout(bootstrapServer);
                         }
@@ -135,7 +135,7 @@ public class RegistrationEngine {
                         return true;
                     }
                 } else {
-                    LOG.error("Bootstrap failed: {} {}.", response.getCode(), response.getErrorMessage());
+                    LOG.info("Bootstrap failed: {} {}.", response.getCode(), response.getErrorMessage());
                     if (observer != null) {
                         observer.onBootstrapFailure(bootstrapServer, response.getCode(), response.getErrorMessage());
                     }
@@ -145,7 +145,7 @@ public class RegistrationEngine {
                 bootstrapHandler.closeSession();
             }
         } else {
-            LOG.warn("Bootstrap sequence already started.");
+            LOG.info("Bootstrap sequence already started.");
             return false;
         }
     }
@@ -155,7 +155,7 @@ public class RegistrationEngine {
         DmServerInfo dmInfo = serversInfo.deviceMangements.values().iterator().next();
 
         if (dmInfo == null) {
-            LOG.error("Trying to register device but there is no LWM2M server config.");
+            LOG.info("Trying to register device but there is no LWM2M server config.");
             return false;
         }
 
@@ -167,7 +167,7 @@ public class RegistrationEngine {
                 null);
         if (response == null) {
             registrationID = null;
-            LOG.error("Registration failed: Timeout.");
+            LOG.info("Registration failed: Timeout.");
             if (observer != null) {
                 observer.onRegistrationTimeout(dmInfo);
             }
@@ -183,7 +183,7 @@ public class RegistrationEngine {
             }
         } else {
             registrationID = null;
-            LOG.error("Registration failed: {} {}.", response.getCode(), response.getErrorMessage());
+            LOG.info("Registration failed: {} {}.", response.getCode(), response.getErrorMessage());
             if (observer != null) {
                 observer.onRegistrationFailure(dmInfo, response.getCode(), response.getErrorMessage());
             }
@@ -199,7 +199,7 @@ public class RegistrationEngine {
         ServersInfo serversInfo = ServersInfoExtractor.getInfo(objectEnablers);
         DmServerInfo dmInfo = serversInfo.deviceMangements.values().iterator().next();
         if (dmInfo == null) {
-            LOG.error("Trying to deregister device but there is no LWM2M server config.");
+            LOG.info("Trying to deregister device but there is no LWM2M server config.");
             return false;
         }
 
@@ -209,7 +209,7 @@ public class RegistrationEngine {
                 new DeregisterRequest(registrationID), DEREGISTRATION_TIMEOUT);
         if (response == null) {
             registrationID = null;
-            LOG.error("Deregistration failed: Timeout.");
+            LOG.info("Deregistration failed: Timeout.");
             if (observer != null) {
                 observer.onDeregistrationTimeout(dmInfo);
             }
@@ -227,7 +227,7 @@ public class RegistrationEngine {
             }
             return true;
         } else {
-            LOG.error("Deregistration failed: {} {}.", response.getCode(), response.getErrorMessage());
+            LOG.info("Deregistration failed: {} {}.", response.getCode(), response.getErrorMessage());
             if (observer != null) {
                 observer.onDeregistrationFailure(dmInfo, response.getCode(), response.getErrorMessage());
             }
@@ -239,7 +239,7 @@ public class RegistrationEngine {
         ServersInfo serversInfo = ServersInfoExtractor.getInfo(objectEnablers);
         DmServerInfo dmInfo = serversInfo.deviceMangements.values().iterator().next();
         if (dmInfo == null) {
-            LOG.error("Trying to update registration but there is no LWM2M server config.");
+            LOG.info("Trying to update registration but there is no LWM2M server config.");
             return false;
         }
 
@@ -263,7 +263,7 @@ public class RegistrationEngine {
             }
             return true;
         } else {
-            LOG.error("Registration update failed: {} {}.", response.getCode(), response.getErrorMessage());
+            LOG.info("Registration update failed: {} {}.", response.getCode(), response.getErrorMessage());
             if (observer != null) {
                 observer.onUpdateFailure(dmInfo, response.getCode(), response.getErrorMessage());
             }
