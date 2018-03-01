@@ -70,7 +70,7 @@ public class RegisterRequest implements UplinkRequest<RegisterResponse> {
         if (additionalAttributes == null)
             this.additionalAttributes = Collections.emptyMap();
         else
-            this.additionalAttributes = Collections.unmodifiableMap(new HashMap<>(additionalAttributes));
+            this.additionalAttributes = Collections.synchronizedMap(new HashMap<>(additionalAttributes));
     }
 
     public String getEndpointName() {

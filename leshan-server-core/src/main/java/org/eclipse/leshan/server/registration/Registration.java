@@ -75,8 +75,8 @@ public class Registration implements Serializable {
 
     private final Date lastUpdate;
 
-    protected Registration(String id, String endpoint, Identity identity, String lwM2mVersion,
-            Long lifetimeInSec, String smsNumber, BindingMode bindingMode, Link[] objectLinks,
+    protected Registration(String id, String endpoint, Identity identity, String lwM2mVersion, Long lifetimeInSec,
+            String smsNumber, BindingMode bindingMode, Link[] objectLinks,
             InetSocketAddress registrationEndpointAddress,
 
             Date registrationDate, Date lastUpdate, Map<String, String> additionalRegistrationAttributes) {
@@ -113,9 +113,9 @@ public class Registration implements Serializable {
         if (additionalRegistrationAttributes == null || additionalRegistrationAttributes.isEmpty()) {
             this.additionalRegistrationAttributes = Collections.emptyMap();
         } else {
-            // We create a new HashMap to have a real immutable map and to avoid "unmodifiableMap" encapsulation.
+
             this.additionalRegistrationAttributes = Collections
-                    .unmodifiableMap(new HashMap<>(additionalRegistrationAttributes));
+                    .synchronizedMap(new HashMap<>(additionalRegistrationAttributes));
         }
 
     }
@@ -131,7 +131,7 @@ public class Registration implements Serializable {
     /**
      * Gets the clients identity.
      * 
-     * @return identity from client's most recent registration or registration update. 
+     * @return identity from client's most recent registration or registration update.
      */
     public Identity getIdentity() {
         return identity;
@@ -397,9 +397,9 @@ public class Registration implements Serializable {
 
         public Registration build() {
             return new Registration(Builder.this.registrationId, Builder.this.endpoint, Builder.this.identity,
-                    Builder.this.lwM2mVersion, Builder.this.lifeTimeInSec, Builder.this.smsNumber,
-                    this.bindingMode, this.objectLinks, this.registrationEndpointAddress, this.registrationDate,
-                    this.lastUpdate, this.additionalRegistrationAttributes);
+                    Builder.this.lwM2mVersion, Builder.this.lifeTimeInSec, Builder.this.smsNumber, this.bindingMode,
+                    this.objectLinks, this.registrationEndpointAddress, this.registrationDate, this.lastUpdate,
+                    this.additionalRegistrationAttributes);
         }
 
     }
