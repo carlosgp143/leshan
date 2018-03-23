@@ -17,6 +17,7 @@
 package org.eclipse.leshan.server.queue;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -25,6 +26,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.leshan.core.request.DownlinkRequest;
 import org.eclipse.leshan.server.registration.Registration;
 
 /**
@@ -40,6 +42,7 @@ public final class PresenceServiceImpl implements PresenceService {
     private final List<PresenceListener> listeners = new CopyOnWriteArrayList<>();
     private final ClientAwakeTimeProvider awakeTimeProvider;
     private final ScheduledExecutorService clientTimersExecutor = Executors.newSingleThreadScheduledExecutor();
+    private QueueModeLwM2mRequestSender requestSender;
 
     public PresenceServiceImpl(ClientAwakeTimeProvider awakeTimeProvider) {
         this.awakeTimeProvider = awakeTimeProvider;
@@ -85,6 +88,9 @@ public final class PresenceServiceImpl implements PresenceService {
                 // Every time we set the clientAwakeTime, in case it changes dynamically
                 stateChanged = status.setAwake();
                 startClientAwakeTimer(reg, status, awakeTimeProvider.getClientAwakeTime(reg));
+                if (stateChanged) {
+                    sendQueuedRequests(reg);
+                }
             }
 
             if (stateChanged) {
@@ -185,5 +191,47 @@ public final class PresenceServiceImpl implements PresenceService {
         if (isClientAwake(reg)) {
             setSleeping(reg);
         }
+    }
+
+    public void addRequestToQueue(DownlinkRequest request, long timeout, Registration reg,
+            QueueModeLwM2mRequestSender requestSender) {
+        System.out.println("Add request called");
+        if (this.requestSender == null) {
+            this.requestSender = requestSender;
+        }
+        PresenceStatus presenceStatus = clientStatusList.get(reg.getEndpoint());
+        if (presenceStatus != null) {
+            presenceStatus.addRequestToQueue(request, timeout);
+            System.out.println("Add request done");
+        }
+    }
+
+    private void sendQueuedRequests(Registration reg) {
+        System.out.println("Send Queue Request called");
+        if (requestSender == null) {
+            System.out.println("No request sender");
+        }
+        if (this.requestSender != null) {
+            System.out.println("requestSender not null");
+            PresenceStatus presenceStatus = clientStatusList.get(reg.getEndpoint());
+            if (presenceStatus != null) {
+                System.out.println("Queue Length: " + presenceStatus.getRequestQueue().size());
+                for (Map.Entry<DownlinkRequest, Long> pair : presenceStatus.getRequestQueue().entrySet()) {
+                    System.out.println("Iteration");
+                    try {
+                        requestSender.send(reg, pair.getKey(), pair.getValue());
+                    } catch (InterruptedException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
+            }
+            presenceStatus.getRequestQueue().clear();
+        }
+
+    }
+
+    public void setRequestSender(QueueModeLwM2mRequestSender requestSender) {
+        this.requestSender = requestSender;
     }
 }

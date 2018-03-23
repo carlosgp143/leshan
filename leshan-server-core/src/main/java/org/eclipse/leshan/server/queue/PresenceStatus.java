@@ -15,7 +15,11 @@
  *******************************************************************************/
 package org.eclipse.leshan.server.queue;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
+
+import org.eclipse.leshan.core.request.DownlinkRequest;
 
 /**
  * Class that contains all the necessary elements to handle the queue mode. Every registration object that uses Queue
@@ -29,8 +33,12 @@ public class PresenceStatus {
 
     private ScheduledFuture<?> clientScheduledFuture;
 
+    /* Queue to store requests */
+    private Map<DownlinkRequest, Long> requestQueue;
+
     public PresenceStatus() {
         this.state = Presence.SLEEPING;
+        this.requestQueue = new HashMap<DownlinkRequest, Long>();
     }
 
     /* Client State Control */
@@ -99,4 +107,11 @@ public class PresenceStatus {
         return this.clientScheduledFuture;
     }
 
+    public void addRequestToQueue(DownlinkRequest request, long timeout) {
+        this.requestQueue.put(request, timeout);
+    }
+
+    public Map<DownlinkRequest, Long> getRequestQueue() {
+        return this.requestQueue;
+    }
 }

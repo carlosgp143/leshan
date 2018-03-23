@@ -56,7 +56,8 @@ public class QueueModeLwM2mRequestSender implements LwM2mRequestSender {
 
         // If the client is sleeping, warn the user and return
         if (!presenceService.isClientAwake(destination)) {
-            throw new ClientSleepingException("The destination client is sleeping, request cannot be sent.");
+            presenceService.addRequestToQueue(request, timeout, destination, this);
+            throw new ClientSleepingException("The request is placed in the Queue.");
         }
 
         // Use delegation to send the request
