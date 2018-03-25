@@ -27,6 +27,10 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.leshan.core.request.DownlinkRequest;
+import org.eclipse.leshan.core.response.ErrorCallback;
+import org.eclipse.leshan.core.response.LwM2mResponse;
+import org.eclipse.leshan.core.response.ResponseCallback;
+import org.eclipse.leshan.server.queue.PresenceStatus.AsyncStoredRequest;
 import org.eclipse.leshan.server.registration.Registration;
 
 /**
@@ -89,7 +93,8 @@ public final class PresenceServiceImpl implements PresenceService {
                 stateChanged = status.setAwake();
                 startClientAwakeTimer(reg, status, awakeTimeProvider.getClientAwakeTime(reg));
                 if (stateChanged) {
-                    sendQueuedRequests(reg);
+                    sendSyncQueuedRequests(reg);
+                    sendAsyncQueuedRequests(reg);
                 }
             }
 
@@ -193,7 +198,7 @@ public final class PresenceServiceImpl implements PresenceService {
         }
     }
 
-    public void addRequestToQueue(DownlinkRequest request, long timeout, Registration reg,
+    public void addSyncRequestToQueue(DownlinkRequest<LwM2mResponse> request, long timeout, Registration reg,
             QueueModeLwM2mRequestSender requestSender) {
         System.out.println("Add request called");
         if (this.requestSender == null) {
@@ -201,13 +206,27 @@ public final class PresenceServiceImpl implements PresenceService {
         }
         PresenceStatus presenceStatus = clientStatusList.get(reg.getEndpoint());
         if (presenceStatus != null) {
-            presenceStatus.addRequestToQueue(request, timeout);
+            presenceStatus.addSyncRequestToQueue(request, timeout);
+            System.out.println("Add request done");
+        }
+    }
+    
+    public void addAsyncRequestToQueue(DownlinkRequest<LwM2mResponse> request, long timeout, 
+            ResponseCallback<LwM2mResponse> responseCallback,
+    		ErrorCallback errorCallback, Registration reg, QueueModeLwM2mRequestSender requestSender) {
+        System.out.println("Add request called");
+        if (this.requestSender == null) {
+            this.requestSender = requestSender;
+        }
+        PresenceStatus presenceStatus = clientStatusList.get(reg.getEndpoint());
+        if (presenceStatus != null) {
+            presenceStatus.addAsyncRequestToQueue(request, timeout, responseCallback, errorCallback);
             System.out.println("Add request done");
         }
     }
 
-    private void sendQueuedRequests(Registration reg) {
-        System.out.println("Send Queue Request called");
+    private void sendSyncQueuedRequests(Registration reg) {
+        System.out.println("Send Sync Queue Request called");
         if (requestSender == null) {
             System.out.println("No request sender");
         }
@@ -215,8 +234,9 @@ public final class PresenceServiceImpl implements PresenceService {
             System.out.println("requestSender not null");
             PresenceStatus presenceStatus = clientStatusList.get(reg.getEndpoint());
             if (presenceStatus != null) {
-                System.out.println("Queue Length: " + presenceStatus.getRequestQueue().size());
-                for (Map.Entry<DownlinkRequest, Long> pair : presenceStatus.getRequestQueue().entrySet()) {
+                System.out.println("Queue Length: " + presenceStatus.getSyncRequestQueue().size());
+                for (Map.Entry<DownlinkRequest<LwM2mResponse>, Long> pair : 
+                    presenceStatus.getSyncRequestQueue().entrySet()) {
                     System.out.println("Iteration");
                     try {
                         requestSender.send(reg, pair.getKey(), pair.getValue());
@@ -226,7 +246,28 @@ public final class PresenceServiceImpl implements PresenceService {
                     }
                 }
             }
-            presenceStatus.getRequestQueue().clear();
+            presenceStatus.getSyncRequestQueue().clear();
+        }
+
+    }
+    
+    private void sendAsyncQueuedRequests(Registration reg) {
+        System.out.println("Send Async Queue Request called");
+        if (requestSender == null) {
+            System.out.println("No request sender");
+        }
+        if (this.requestSender != null) {
+            System.out.println("requestSender not null");
+            PresenceStatus presenceStatus = clientStatusList.get(reg.getEndpoint());
+            if (presenceStatus != null) {
+                System.out.println("Queue Length: " + presenceStatus.getAsyncRequestQueue().size());
+                for (AsyncStoredRequest asyncRequest : presenceStatus.getAsyncRequestQueue()) {
+                    System.out.println("Iteration");
+                    requestSender.send(reg, asyncRequest.getRequest(), asyncRequest.getTimeout(),
+							asyncRequest.getResponseCallback(), asyncRequest.getErrorCallback());
+                }
+            }
+            presenceStatus.getAsyncRequestQueue().clear();
         }
 
     }

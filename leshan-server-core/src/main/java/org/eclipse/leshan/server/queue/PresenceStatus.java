@@ -15,11 +15,16 @@
  *******************************************************************************/
 package org.eclipse.leshan.server.queue;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 
 import org.eclipse.leshan.core.request.DownlinkRequest;
+import org.eclipse.leshan.core.response.ErrorCallback;
+import org.eclipse.leshan.core.response.LwM2mResponse;
+import org.eclipse.leshan.core.response.ResponseCallback;
 
 /**
  * Class that contains all the necessary elements to handle the queue mode. Every registration object that uses Queue
@@ -33,12 +38,14 @@ public class PresenceStatus {
 
     private ScheduledFuture<?> clientScheduledFuture;
 
-    /* Queue to store requests */
-    private Map<DownlinkRequest, Long> requestQueue;
+    /* Queues to store requests */
+    private  Map<DownlinkRequest<LwM2mResponse>, Long> syncRequestQueue;
+    private List<AsyncStoredRequest> asyncRequestQueue;
 
     public PresenceStatus() {
         this.state = Presence.SLEEPING;
-        this.requestQueue = new HashMap<DownlinkRequest, Long>();
+        this.syncRequestQueue = new HashMap<DownlinkRequest<LwM2mResponse>, Long>();
+        this.asyncRequestQueue = new ArrayList<AsyncStoredRequest>();
     }
 
     /* Client State Control */
@@ -107,11 +114,57 @@ public class PresenceStatus {
         return this.clientScheduledFuture;
     }
 
-    public void addRequestToQueue(DownlinkRequest request, long timeout) {
-        this.requestQueue.put(request, timeout);
+    public void addSyncRequestToQueue(DownlinkRequest<LwM2mResponse> request, long timeout) {
+        this.syncRequestQueue.put(request, timeout);
     }
 
-    public Map<DownlinkRequest, Long> getRequestQueue() {
-        return this.requestQueue;
+    public Map<DownlinkRequest<LwM2mResponse>, Long> getSyncRequestQueue() {
+        return this.syncRequestQueue;
     }
+    
+    public void addAsyncRequestToQueue(DownlinkRequest<LwM2mResponse> request, long timeout,
+            ResponseCallback<LwM2mResponse> responseCallback, ErrorCallback errorCallback) {
+        this.asyncRequestQueue.add(new AsyncStoredRequest(request, timeout, responseCallback, errorCallback));
+    }
+
+    public List<AsyncStoredRequest> getAsyncRequestQueue() {
+        return this.asyncRequestQueue;
+    }
+    
+    public class AsyncStoredRequest {
+    	DownlinkRequest<LwM2mResponse> request;
+    	long timeout;
+    	private ResponseCallback<LwM2mResponse> responseCallback;
+    	private ErrorCallback errorCallback;
+    	
+    	public AsyncStoredRequest ( DownlinkRequest<LwM2mResponse> request, long timeout,
+    			ResponseCallback<LwM2mResponse> responseCallback, ErrorCallback errorCallback) {
+    		this.request = request;
+    		this.timeout = timeout;
+    		this.responseCallback = responseCallback;
+    		this.errorCallback = errorCallback;
+    	}
+    	
+    	public DownlinkRequest<LwM2mResponse> getRequest() {
+    		return this.request;
+    	}
+    	
+    	public long getTimeout() {
+    		return this.timeout;
+    	}
+    	
+    	public ResponseCallback<LwM2mResponse> getResponseCallback() {
+    		return this.responseCallback;
+    	}
+    	
+    	public ErrorCallback getErrorCallback() {
+    		return this.errorCallback;
+    	}
+    	
+    	
+    }
+    
+    
 }
+
+
