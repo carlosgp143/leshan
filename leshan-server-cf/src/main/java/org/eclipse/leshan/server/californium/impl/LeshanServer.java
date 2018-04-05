@@ -67,296 +67,316 @@ import org.slf4j.LoggerFactory;
 /**
  * A Lightweight M2M server.
  * <p>
- * This implementation starts a Californium {@link CoapServer} with a non-secure and secure endpoint. This CoAP server
- * defines a <i>/rd</i> resource as described in the CoRE RD specification.
+ * This implementation starts a Californium {@link CoapServer} with a non-secure
+ * and secure endpoint. This CoAP server defines a <i>/rd</i> resource as
+ * described in the CoRE RD specification.
  * </p>
  * <p>
- * This class is the entry point to send synchronous and asynchronous requests to registered clients.
+ * This class is the entry point to send synchronous and asynchronous requests
+ * to registered clients.
  * </p>
  * <p>
- * The {@link LeshanServerBuilder} should be the preferred way to build an instance of {@link LeshanServer}.
+ * The {@link LeshanServerBuilder} should be the preferred way to build an
+ * instance of {@link LeshanServer}.
  * </p>
  */
 public class LeshanServer implements LwM2mServer {
 
-    private final CoapServer coapServer;
+	private final CoapServer coapServer;
 
-    private static final Logger LOG = LoggerFactory.getLogger(LeshanServer.class);
+	private static final Logger LOG = LoggerFactory.getLogger(LeshanServer.class);
 
-    // We choose a default timeout a bit higher to the MAX_TRANSMIT_WAIT(62-93s) which is the time from starting to
-    // send a Confirmable message to the time when an acknowledgement is no longer expected.
-    private static final long DEFAULT_TIMEOUT = 2 * 60 * 1000l; // 2min in ms
+	// We choose a default timeout a bit higher to the MAX_TRANSMIT_WAIT(62-93s)
+	// which is the time from starting to
+	// send a Confirmable message to the time when an acknowledgement is no longer
+	// expected.
+	private static final long DEFAULT_TIMEOUT = 2 * 60 * 1000l; // 2min in ms
 
-    private final LwM2mRequestSender requestSender;
+	private final LwM2mRequestSender requestSender;
 
-    private final RegistrationServiceImpl registrationService;
+	private final RegistrationServiceImpl registrationService;
 
-    private final ObservationServiceImpl observationService;
+	private final ObservationServiceImpl observationService;
 
-    private final SecurityStore securityStore;
+	private final SecurityStore securityStore;
 
-    private final LwM2mModelProvider modelProvider;
+	private final LwM2mModelProvider modelProvider;
 
-    private final CoapEndpoint unsecuredEndpoint;
+	private final CoapEndpoint unsecuredEndpoint;
 
-    private final CoapEndpoint securedEndpoint;
+	private final CoapEndpoint securedEndpoint;
 
-    private final PresenceServiceImpl presenceService;
+	private final PresenceServiceImpl presenceService;
 
-    private final CaliforniumRegistrationStore registrationStore;
+	private final CaliforniumRegistrationStore registrationStore;
 
-    /**
-     * Initialize a server which will bind to the specified address and port.
-     *
-     * @param unsecuredEndpoint the unsecure coap endpoint.
-     * @param securedEndpoint the secure coap endpoint.
-     * @param registrationStore the {@link Registration} store.
-     * @param securityStore the {@link SecurityInfo} store.
-     * @param authorizer define which devices is allow to register on this server.
-     * @param modelProvider provides the objects description for each client.
-     * @param decoder decoder used to decode response payload.
-     * @param encoder encode used to encode request payload.
-     * @param coapConfig the CoAP {@link NetworkConfig}.
-     * @param noQueueMode true to disable presenceService.
-     * @param awakeTimeProvider to set the client awake time if queue mode is used
-     */
-    public LeshanServer(CoapEndpoint unsecuredEndpoint, CoapEndpoint securedEndpoint,
-            CaliforniumRegistrationStore registrationStore, SecurityStore securityStore, Authorizer authorizer,
-            LwM2mModelProvider modelProvider, LwM2mNodeEncoder encoder, LwM2mNodeDecoder decoder,
-            NetworkConfig coapConfig, boolean noQueueMode, ClientAwakeTimeProvider awakeTimeProvider) {
+	/**
+	 * Initialize a server which will bind to the specified address and port.
+	 *
+	 * @param unsecuredEndpoint
+	 *            the unsecure coap endpoint.
+	 * @param securedEndpoint
+	 *            the secure coap endpoint.
+	 * @param registrationStore
+	 *            the {@link Registration} store.
+	 * @param securityStore
+	 *            the {@link SecurityInfo} store.
+	 * @param authorizer
+	 *            define which devices is allow to register on this server.
+	 * @param modelProvider
+	 *            provides the objects description for each client.
+	 * @param decoder
+	 *            decoder used to decode response payload.
+	 * @param encoder
+	 *            encode used to encode request payload.
+	 * @param coapConfig
+	 *            the CoAP {@link NetworkConfig}.
+	 * @param noQueueMode
+	 *            true to disable presenceService.
+	 * @param awakeTimeProvider
+	 *            to set the client awake time if queue mode is used
+	 */
+	public LeshanServer(CoapEndpoint unsecuredEndpoint, CoapEndpoint securedEndpoint,
+			CaliforniumRegistrationStore registrationStore, SecurityStore securityStore, Authorizer authorizer,
+			LwM2mModelProvider modelProvider, LwM2mNodeEncoder encoder, LwM2mNodeDecoder decoder,
+			NetworkConfig coapConfig, boolean noQueueMode, ClientAwakeTimeProvider awakeTimeProvider) {
 
-        Validate.notNull(registrationStore, "registration store cannot be null");
-        Validate.notNull(authorizer, "authorizer cannot be null");
-        Validate.notNull(modelProvider, "modelProvider cannot be null");
-        Validate.notNull(encoder, "encoder cannot be null");
-        Validate.notNull(decoder, "decoder cannot be null");
-        Validate.notNull(coapConfig, "coapConfig cannot be null");
+		Validate.notNull(registrationStore, "registration store cannot be null");
+		Validate.notNull(authorizer, "authorizer cannot be null");
+		Validate.notNull(modelProvider, "modelProvider cannot be null");
+		Validate.notNull(encoder, "encoder cannot be null");
+		Validate.notNull(decoder, "decoder cannot be null");
+		Validate.notNull(coapConfig, "coapConfig cannot be null");
 
-        // Init services and stores
-        this.registrationStore = registrationStore;
-        registrationService = new RegistrationServiceImpl(registrationStore);
-        this.securityStore = securityStore;
-        observationService = new ObservationServiceImpl(registrationStore, modelProvider, decoder);
-        this.modelProvider = modelProvider;
+		// Init services and stores
+		this.registrationStore = registrationStore;
+		registrationService = new RegistrationServiceImpl(registrationStore);
+		this.securityStore = securityStore;
+		observationService = new ObservationServiceImpl(registrationStore, modelProvider, decoder);
+		this.modelProvider = modelProvider;
 
-        // Cancel observations on client unregistering
-        registrationService.addListener(new RegistrationListener() {
+		// Cancel observations on client unregistering
+		registrationService.addListener(new RegistrationListener() {
 
-            @Override
-            public void updated(RegistrationUpdate update, Registration updatedRegistration,
-                    Registration previousRegistration) {
-            }
+			@Override
+			public void updated(RegistrationUpdate update, Registration updatedRegistration,
+					Registration previousRegistration) {
+			}
 
-            @Override
-            public void unregistered(Registration registration, Collection<Observation> observations, boolean expired,
-                    Registration newReg) {
-                requestSender.cancelPendingRequests(registration);
-            }
+			@Override
+			public void unregistered(Registration registration, Collection<Observation> observations, boolean expired,
+					Registration newReg) {
+				requestSender.cancelPendingRequests(registration);
+			}
 
-            @Override
-            public void registered(Registration registration, Registration previousReg,
-                    Collection<Observation> previousObsersations) {
-            }
-        });
+			@Override
+			public void registered(Registration registration, Registration previousReg,
+					Collection<Observation> previousObsersations) {
+			}
+		});
 
-        // define a set of endpoints
-        Set<Endpoint> endpoints = new HashSet<>();
-        coapServer = new CoapServer(coapConfig) {
-            @Override
-            protected Resource createRoot() {
-                return new RootResource();
-            }
-        };
+		// define a set of endpoints
+		Set<Endpoint> endpoints = new HashSet<>();
+		coapServer = new CoapServer(coapConfig) {
+			@Override
+			protected Resource createRoot() {
+				return new RootResource();
+			}
+		};
 
-        // default endpoint
-        this.unsecuredEndpoint = unsecuredEndpoint;
-        if (unsecuredEndpoint != null) {
-            unsecuredEndpoint.addNotificationListener(observationService);
-            observationService.setNonSecureEndpoint(unsecuredEndpoint);
-            coapServer.addEndpoint(unsecuredEndpoint);
-            endpoints.add(unsecuredEndpoint);
-        }
+		// default endpoint
+		this.unsecuredEndpoint = unsecuredEndpoint;
+		if (unsecuredEndpoint != null) {
+			unsecuredEndpoint.addNotificationListener(observationService);
+			observationService.setNonSecureEndpoint(unsecuredEndpoint);
+			coapServer.addEndpoint(unsecuredEndpoint);
+			endpoints.add(unsecuredEndpoint);
+		}
 
-        // secure endpoint
-        this.securedEndpoint = securedEndpoint;
-        if (securedEndpoint != null) {
-            securedEndpoint.addNotificationListener(observationService);
-            observationService.setSecureEndpoint(securedEndpoint);
-            coapServer.addEndpoint(securedEndpoint);
-            endpoints.add(securedEndpoint);
-        }
+		// secure endpoint
+		this.securedEndpoint = securedEndpoint;
+		if (securedEndpoint != null) {
+			securedEndpoint.addNotificationListener(observationService);
+			observationService.setSecureEndpoint(securedEndpoint);
+			coapServer.addEndpoint(securedEndpoint);
+			endpoints.add(securedEndpoint);
+		}
 
-        // define /rd resource
-        RegisterResource rdResource = new RegisterResource(
-                new RegistrationHandler(this.registrationService, authorizer));
-        coapServer.add(rdResource);
+		// define /rd resource
+		RegisterResource rdResource = new RegisterResource(
+				new RegistrationHandler(this.registrationService, authorizer));
+		coapServer.add(rdResource);
 
-        // create sender
-        // notify applications of LWM2M client coming online/offline
-        if (noQueueMode) {
-            // if no queue mode, create a "simple" sender
-            requestSender = new CaliforniumLwM2mRequestSender(endpoints, observationService, modelProvider, encoder,
-                    decoder);
-            presenceService = null;
-        } else {
-            presenceService = new PresenceServiceImpl(awakeTimeProvider);
-            registrationService.addListener(new PresenceStateListener(presenceService));
-            requestSender = new QueueModeLwM2mRequestSender(presenceService,
-                    new CaliforniumLwM2mRequestSender(endpoints, observationService, modelProvider, encoder, decoder));
-        }
-    }
+		// create sender
+		// notify applications of LWM2M client coming online/offline
+		if (noQueueMode) {
+			// if no queue mode, create a "simple" sender
+			requestSender = new CaliforniumLwM2mRequestSender(endpoints, observationService, modelProvider, encoder,
+					decoder);
+			presenceService = null;
+		} else {
+			presenceService = new PresenceServiceImpl(awakeTimeProvider);
+			registrationService.addListener(new PresenceStateListener(presenceService));
+			requestSender = new QueueModeLwM2mRequestSender(presenceService,
+					new CaliforniumLwM2mRequestSender(endpoints, observationService, modelProvider, encoder, decoder));
+		}
+	}
 
-    @Override
-    public void start() {
+	@Override
+	public void start() {
 
-        // Start stores
-        if (registrationStore instanceof Startable) {
-            ((Startable) registrationStore).start();
-        }
-        if (securityStore instanceof Startable) {
-            ((Startable) securityStore).start();
-        }
+		// Start stores
+		if (registrationStore instanceof Startable) {
+			((Startable) registrationStore).start();
+		}
+		if (securityStore instanceof Startable) {
+			((Startable) securityStore).start();
+		}
 
-        // Start server
-        coapServer.start();
+		// Start server
+		coapServer.start();
 
-        if (LOG.isInfoEnabled()) {
-            LOG.info("LWM2M server started at {} {}",
-                    getUnsecuredAddress() == null ? "" : "coap://" + getUnsecuredAddress(),
-                    getSecuredAddress() == null ? "" : "coaps://" + getSecuredAddress());
-        }
-    }
+		if (LOG.isInfoEnabled()) {
+			LOG.info("LWM2M server started at {} {}",
+					getUnsecuredAddress() == null ? "" : "coap://" + getUnsecuredAddress(),
+					getSecuredAddress() == null ? "" : "coaps://" + getSecuredAddress());
+		}
+	}
 
-    @Override
-    public void stop() {
-        // Stop server
-        coapServer.stop();
+	@Override
+	public void stop() {
+		// Stop server
+		coapServer.stop();
 
-        // Stop stores
-        if (registrationStore instanceof Stoppable) {
-            ((Stoppable) registrationStore).stop();
-        }
-        if (securityStore instanceof Stoppable) {
-            ((Stoppable) securityStore).stop();
-        }
+		// Stop stores
+		if (registrationStore instanceof Stoppable) {
+			((Stoppable) registrationStore).stop();
+		}
+		if (securityStore instanceof Stoppable) {
+			((Stoppable) securityStore).stop();
+		}
 
-        LOG.info("LWM2M server stopped.");
-    }
+		LOG.info("LWM2M server stopped.");
+	}
 
-    @Override
-    public void destroy() {
-        // Destroy server
-        coapServer.destroy();
+	@Override
+	public void destroy() {
+		// Destroy server
+		coapServer.destroy();
 
-        // Destroy stores
-        if (registrationStore instanceof Destroyable) {
-            ((Destroyable) registrationStore).destroy();
-        } else if (registrationStore instanceof Stoppable) {
-            ((Stoppable) registrationStore).stop();
-        }
+		// Destroy stores
+		if (registrationStore instanceof Destroyable) {
+			((Destroyable) registrationStore).destroy();
+		} else if (registrationStore instanceof Stoppable) {
+			((Stoppable) registrationStore).stop();
+		}
 
-        if (securityStore instanceof Destroyable) {
-            ((Destroyable) securityStore).destroy();
-        } else if (securityStore instanceof Stoppable) {
-            ((Stoppable) securityStore).stop();
-        }
+		if (securityStore instanceof Destroyable) {
+			((Destroyable) securityStore).destroy();
+		} else if (securityStore instanceof Stoppable) {
+			((Stoppable) securityStore).stop();
+		}
 
-        LOG.info("LWM2M server destroyed.");
-    }
+		LOG.info("LWM2M server destroyed.");
+	}
 
-    @Override
-    public RegistrationService getRegistrationService() {
-        return this.registrationService;
-    }
+	@Override
+	public RegistrationService getRegistrationService() {
+		return this.registrationService;
+	}
 
-    @Override
-    public ObservationService getObservationService() {
-        return this.observationService;
-    }
+	@Override
+	public ObservationService getObservationService() {
+		return this.observationService;
+	}
 
-    @Override
-    public PresenceService getPresenceService() {
-        return this.presenceService;
-    }
+	@Override
+	public PresenceService getPresenceService() {
+		return this.presenceService;
+	}
 
-    @Override
-    public SecurityStore getSecurityStore() {
-        return this.securityStore;
-    }
+	@Override
+	public SecurityStore getSecurityStore() {
+		return this.securityStore;
+	}
 
-    @Override
-    public LwM2mModelProvider getModelProvider() {
-        return this.modelProvider;
-    }
+	@Override
+	public LwM2mModelProvider getModelProvider() {
+		return this.modelProvider;
+	}
 
-    @Override
-    public <T extends LwM2mResponse> T send(Registration destination, DownlinkRequest<T> request)
-            throws InterruptedException {
+	@Override
+	public <T extends LwM2mResponse> T send(Registration destination, DownlinkRequest<T> request)
+			throws InterruptedException {
 
-        return requestSender.send(destination, request, DEFAULT_TIMEOUT);
-    }
+		return requestSender.send(destination, request, DEFAULT_TIMEOUT);
+	}
 
-    @Override
-    public <T extends LwM2mResponse> T send(Registration destination, DownlinkRequest<T> request, long timeout)
-            throws InterruptedException {
+	@Override
+	public <T extends LwM2mResponse> T send(Registration destination, DownlinkRequest<T> request, long timeout)
+			throws InterruptedException {
 
-        return requestSender.send(destination, request, timeout);
-    }
+		return requestSender.send(destination, request, timeout);
+	}
 
-    @Override
-    public <T extends LwM2mResponse> void send(Registration destination, DownlinkRequest<T> request,
-            ResponseCallback<T> responseCallback, ErrorCallback errorCallback) {
+	@Override
+	public <T extends LwM2mResponse> void send(Registration destination, DownlinkRequest<T> request,
+			ResponseCallback<T> responseCallback, ErrorCallback errorCallback) {
 
-        requestSender.send(destination, request, DEFAULT_TIMEOUT, responseCallback, errorCallback);
-    }
+		requestSender.send(destination, request, DEFAULT_TIMEOUT, responseCallback, errorCallback);
+	}
 
-    @Override
-    public <T extends LwM2mResponse> void send(Registration destination, DownlinkRequest<T> request, long timeout,
-            ResponseCallback<T> responseCallback, ErrorCallback errorCallback) {
+	@Override
+	public <T extends LwM2mResponse> void send(Registration destination, DownlinkRequest<T> request, long timeout,
+			ResponseCallback<T> responseCallback, ErrorCallback errorCallback) {
 
-        requestSender.send(destination, request, timeout, responseCallback, errorCallback);
-    }
+		requestSender.send(destination, request, timeout, responseCallback, errorCallback);
+	}
 
-    /**
-     * @return the underlying {@link CoapServer}
-     */
-    public CoapServer getCoapServer() {
-        return coapServer;
-    }
+	/**
+	 * @return the underlying {@link CoapServer}
+	 */
+	public CoapServer getCoapServer() {
+		return coapServer;
+	}
 
-    public InetSocketAddress getUnsecuredAddress() {
-        if (unsecuredEndpoint != null) {
-            return unsecuredEndpoint.getAddress();
-        } else {
-            return null;
-        }
-    }
+	public InetSocketAddress getUnsecuredAddress() {
+		if (unsecuredEndpoint != null) {
+			return unsecuredEndpoint.getAddress();
+		} else {
+			return null;
+		}
+	}
 
-    public InetSocketAddress getSecuredAddress() {
-        if (securedEndpoint != null) {
-            return securedEndpoint.getAddress();
-        } else {
-            return null;
-        }
-    }
+	public InetSocketAddress getSecuredAddress() {
+		if (securedEndpoint != null) {
+			return securedEndpoint.getAddress();
+		} else {
+			return null;
+		}
+	}
 
-    /**
-     * The Leshan Root Resource.
-     */
-    private class RootResource extends CoapResource {
+	/**
+	 * The Leshan Root Resource.
+	 */
+	private class RootResource extends CoapResource {
 
-        public RootResource() {
-            super("");
-        }
+		public RootResource() {
+			super("");
+		}
 
-        @Override
-        public void handleGET(CoapExchange exchange) {
-            exchange.respond(ResponseCode.NOT_FOUND);
-        }
+		@Override
+		public void handleGET(CoapExchange exchange) {
+			exchange.respond(ResponseCode.NOT_FOUND);
+		}
 
-        @Override
-        public List<Endpoint> getEndpoints() {
-            return coapServer.getEndpoints();
-        }
-    }
+		@Override
+		public List<Endpoint> getEndpoints() {
+			return coapServer.getEndpoints();
+		}
+	}
+
+	public void setClientAwakeTimeProvider(ClientAwakeTimeProvider awakeTimeProvider) {
+		this.presenceService.setClientAwakeTimeProvider(awakeTimeProvider);
+	}
 }
